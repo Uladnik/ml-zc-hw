@@ -117,6 +117,11 @@ def regularize(df_learn, y_learn, df_apply, y_apply, j=-6, k=2):
     return best_r
 
 # %%
+# This function wasn't used in the project
+def get_target(df):
+    features = list(df.columns)
+    return df[features[:-1]], df[features[-1]]
+# %%
 # Special anchor for easy select of all the code above
 # %%
 overview(df)
