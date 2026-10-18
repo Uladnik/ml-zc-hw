@@ -58,14 +58,20 @@ def preprocess():
     cats = make_column_selector(dtype_exclude=["number"])
     nt = Pipeline([("scaler", StandardScaler())])
     ct = Pipeline(
-        [("onehot", OneHotEncoder(sparse_output=False, handle_unknown="ignore"))]
+        [
+            (
+                "onehot",
+                OneHotEncoder(
+                    sparse_output=False, handle_unknown="ignore", drop="first"
+                ),
+            )
+        ]
     )
     preprocessor = ColumnTransformer([("num", nt, nums), ("cat", ct, cats)])
     return preprocessor
 
 
-def evaluate_pipeline(pipeline, X_train, y_train, X_test, y_test):
-    pipeline.fit(X_train, y_train)
+def evaluate_pipeline(pipeline, X_test, y_test):
     y_pred = pipeline.predict(X_test)
 
     if is_classifier(pipeline):
@@ -97,23 +103,55 @@ def get_feature_importance(pipeline):
         return None
 
 
-def get_analysis(pipeline):
-    model = pipeline.named_steps["model"]
+def get_analysis(pipeline_or_search):
+    if hasattr(pipeline_or_search, "best_estimator_"):
+        model = pipeline_or_search.best_estimator_.named_steps.get(
+            "classifier"
+        ) or pipeline_or_search.best_estimator_.named_steps.get("model")
+        is_grid = True
+    else:
+        model = pipeline_or_search.named_steps.get(
+            "classifier"
+        ) or pipeline_or_search.named_steps.get("model")
+        is_grid = False
+
+    if model is None:
+        print("Model step not found in pipeline.")
+        return None
 
     if hasattr(model, "intercept_"):
-        print(f"Intercept: {model.intercept_}")
+        print("Intercept:", *model.intercept_)
     if hasattr(model, "classes_"):
-        print(f"Classes: {model.classes_}")
+        print("Classes:", *model.classes_)
     if hasattr(model, "n_iter_"):
-        print(f"Iterations: {model.n_iter_}")
-    if hasattr(model, "Cs_"):
-        print(f"C values: {model.Cs_}")
-    if hasattr(model, "scores_"):
-        print(f"Scores: {model.scores_}")
-        return model.scores_
+        print("Iterations:", model.n_iter_)
+
+    if hasattr(model, "Cs_") and hasattr(model, "scores_"):
+        print("\n--- CV Scores per C (Built-in CV) ---")
+        print("C values:\tMean:\tStd:")
+        class_key = list(model.scores_.keys())[0]
+        scores_matrix = model.scores_[class_key]
+
+        for Cs, scores_row in zip(model.Cs_, scores_matrix):
+            print(
+                round(float(Cs), 7),
+                "\t",
+                round(np.mean(scores_row), 7),
+                "\t",
+                round(np.std(scores_row), 7),
+            )
+
+    elif is_grid and hasattr(pipeline_or_search, "cv_results_"):
+        print("\n--- GridSearchCV Results ---")
+        cv_res = pipeline_or_search.cv_results_
+        for mean_score, std_score, params in zip(
+            cv_res["mean_test_score"], cv_res["std_test_score"], cv_res["params"]
+        ):
+            print(f"Params: {params} | Mean: {mean_score:.5f} | Std: {std_score:.5f}")
     else:
-        print("No scores_ attribute found in model")
-        return None
+        print("\n(Standard model without built-in CV or grid search history)")
+
+    return pipeline_or_search
 
 
 preprocessor = preprocess()
