@@ -120,9 +120,9 @@ def get_analysis(pipeline_or_search):
         return None
 
     if hasattr(model, "intercept_"):
-        print("Intercept:", *model.intercept_)
+        print("Intercept:", model.intercept_)
     if hasattr(model, "classes_"):
-        print("Classes:", *model.classes_)
+        print("Classes:", model.classes_)
     if hasattr(model, "n_iter_"):
         print("Iterations:", model.n_iter_)
 
