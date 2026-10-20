@@ -85,7 +85,7 @@ def evaluate_pipeline(pipeline, X_test, y_test):
         print("R2 Score:", r2_score(y_test, y_pred))
         print("RMSE:", root_mean_squared_error(y_test, y_pred))
 
-    return pipeline
+    return None
 
 
 def get_feature_importance(pipeline):
@@ -105,14 +105,20 @@ def get_feature_importance(pipeline):
 
 def get_analysis(pipeline_or_search):
     if hasattr(pipeline_or_search, "best_estimator_"):
-        model = pipeline_or_search.best_estimator_.named_steps.get(
-            "classifier"
-        ) or pipeline_or_search.best_estimator_.named_steps.get("model")
+        best_est = pipeline_or_search.best_estimator_
+        model = (best_est.named_steps.get("classifier") 
+            or best_est.named_steps.get("regressor")
+            or best_est.named_steps.get("model")
+        )
         is_grid = True
+        print("Best hyperparameters:", best_est.best_params_)
     else:
-        model = pipeline_or_search.named_steps.get(
-            "classifier"
-        ) or pipeline_or_search.named_steps.get("model")
+        model = (pipeline_or_search.named_steps.get("classifier") 
+            or pipeline_or_search.named_steps.get("regressor")
+            or pipeline_or_search.named_steps.get("model")
+            if hasattr(pipeline_or_search, "named_steps")
+            else pipeline_or_search
+        )
         is_grid = False
 
     if model is None:
@@ -122,10 +128,15 @@ def get_analysis(pipeline_or_search):
     if hasattr(model, "intercept_"):
         print("Intercept:", model.intercept_)
     if hasattr(model, "classes_"):
-        print("Classes:", model.classes_)
+        print("Classes:", *model.classes_)
     if hasattr(model, "n_iter_"):
         print("Iterations:", model.n_iter_)
-
+    if hasattr(model, "alpha_"):
+        print("Selected alpha:", model.alpha_)
+    if hasattr(model, "alphas_"):
+        print("Tested alphas:", *model.alphas_)
+    if hasattr(model, "C_"):
+        print("Selected C:", model.C_)
     if hasattr(model, "Cs_") and hasattr(model, "scores_"):
         print("\n--- CV Scores per C (Built-in CV) ---")
         print("C values:\tMean:\tStd:")
@@ -148,10 +159,12 @@ def get_analysis(pipeline_or_search):
             cv_res["mean_test_score"], cv_res["std_test_score"], cv_res["params"]
         ):
             print(f"Params: {params} | Mean: {mean_score:.5f} | Std: {std_score:.5f}")
-    else:
-        print("\n(Standard model without built-in CV or grid search history)")
+    elif (not is_grid
+        and not hasattr(model, "alpha_")
+        and not hasattr(model, "classes_")):
+        print("\n(Standard model without built-in history)")
 
-    return pipeline_or_search
+    return None
 
 
 preprocessor = preprocess()
