@@ -12,7 +12,7 @@ X = df.drop(["churn", "customerid"], axis=1)
 
 X.totalcharges = pd.to_numeric(X.totalcharges, errors="coerce")
 X.totalcharges = X.totalcharges.fillna(0)
-df.seniorcitizen = df.seniorcitizen.astype(str)
+X.seniorcitizen = X.seniorcitizen.astype(str)
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=1, stratify=y
