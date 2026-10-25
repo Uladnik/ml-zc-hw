@@ -1,8 +1,6 @@
 import pickle
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import (
     mean_absolute_error,
@@ -27,7 +25,6 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.base import is_classifier
 from scipy import sparse as sp
-from ucimlrepo import fetch_ucirepo as uci
 
 
 def overview(df):
