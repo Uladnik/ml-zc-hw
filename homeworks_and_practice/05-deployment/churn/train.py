@@ -28,6 +28,6 @@ pipeline_mod = Pipeline([("preprocessor", preprocessor),
 pipeline_mod.fit(X_train, y_train)
 
 best_pipeline = pipeline_mod
-with open('model_bin', "wb") as f_out:
+with open('model.bin', "wb") as f_out:
     pickle.dump(best_pipeline, f_out)
-    print("Saved model to model_bin")
+    print("Saved model to model.bin")
