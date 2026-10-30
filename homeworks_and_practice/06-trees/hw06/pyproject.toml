@@ -1,0 +1,31 @@
+[project]
+name = "hw06"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Uladnik", email = "vladmelnik1993@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.162.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "pandas>=3.1.0",
+    "scikit-learn>=1.9.1",
+    "seaborn>=0.13.2",
+    "uvicorn>=0.54.0",
+    "xgboost>=3.2.0",
+]
+
+[project.scripts]
+hw06 = "hw06:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "requests>=2.34.2",
+]
