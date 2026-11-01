@@ -215,7 +215,6 @@ def objective(trial, X_train, y_train, X_val=None, y_val=None, scoring='r2',
         'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, leaf),
         'max_features': trial.suggest_float('max_features', 0.3, ft),
         'random_state': 1,
-        'n_jobs': -1
     }
     
     model = RandomForestRegressor(**params)
