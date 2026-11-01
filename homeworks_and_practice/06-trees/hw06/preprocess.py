@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import optuna
 import pandas as pd
 import pickle
 import seaborn as sns
@@ -31,7 +32,9 @@ from sklearn.metrics import (
     confusion_matrix,
     classification_report,
 )
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import (
+    cross_val_score, train_test_split, GridSearchCV, RandomizedSearchCV
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import (
@@ -203,6 +206,41 @@ def parse_xgb_output(output):
     df_results = pd.DataFrame(results, columns=columns)
     return df_results
 
+def objective(trial, X_train, y_train, X_val=None, y_val=None, scoring='r2',
+              cv=5, est=300, dep=50, spl=20, leaf=20, ft=1.0):
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 20, est),
+        'max_depth': trial.suggest_int('max_depth', 5, dep),
+        'min_samples_split': trial.suggest_int('min_samples_split', 2, spl),
+        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, leaf),
+        'max_features': trial.suggest_float('max_features', 0.3, ft),
+        'random_state': 1,
+        'n_jobs': -1
+    }
+    
+    model = RandomForestRegressor(**params)
+    
+    if X_val is not None and y_val is not None:
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_val)
+        if scoring == 'r2':
+            return r2_score(y_val, y_pred)
+        if scoring == 'root_mean_squared_error':
+            return np.sqrt(mean_squared_error(y_val, y_pred))
+        if scoring == 'mean_absolute_error':
+            return mean_absolute_error(y_val, y_pred)
+        if scoring == 'neg_root_mean_squared_error':
+            return -np.sqrt(mean_squared_error(y_val, y_pred))
+        if scoring == 'neg_mean_absolute_error':
+            return -mean_absolute_error(y_val, y_pred)
+    else:
+        scores = cross_val_score(
+            model, X_train, y_train, 
+            cv=cv, 
+            scoring=scoring, 
+            n_jobs=-1
+        )
+        return scores.mean()
+
 
 preprocessor = preprocess()
-
