@@ -67,16 +67,9 @@ def preprocess():
     nums = make_column_selector(dtype_include=["number"])
     cats = make_column_selector(dtype_exclude=["number"])
     nt = Pipeline([("scaler", StandardScaler())])
-    ct = Pipeline(
-        [
-            (
-                "onehot",
-                OneHotEncoder(
+    ct = Pipeline([("onehot", OneHotEncoder(
                     sparse_output=True, handle_unknown="ignore", drop="first"
-                ),
-            )
-        ]
-    )
+                 ))])
     preprocessor = ColumnTransformer([("num", nt, nums), ("cat", ct, cats)])
     return preprocessor
 
@@ -204,211 +197,65 @@ def parse_xgb_output(output):
     return df_results
 
 
-def line(trial, X, y, mod='r', scor_r='r2', scor_c='roc_auc', cv=5):
-    l1 = trial.suggest_float('l1_ratio', 0.0, 1.0)
-    if mod == 'r':
-        alpha = trial.suggest_float('alpha', 1e-6, 1e4, log=True)
-        model = ElasticNet(
-            alpha=alpha, l1_ratio=l1, max_iter=10000,  random_state=1)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_r, n_jobs=-1)
-    elif mod == 'c':
-        C = trial.suggest_float('C', 1e-6, 1e4, log=True)
-        model = LogisticRegression(solver='saga', penalty='elasticnet',        
-            C=C, l1_ratio=l1, max_iter=10000, random_state=1)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_c, n_jobs=-1)
-    else:
-        raise ValueError("""
-Invalid model type. Choose mod:
-'r' for regression or 'c' for classification
-""")            
-    return scores.mean()
-
-
-def forest(trial, X, y, mod='r', scor_r='r2', scor_c='roc_auc',
-              cv=5, est=300, dep=50, spl=20, leaf=20, ft=None):
-    if ft is None:
-        ft = X.shape[1]
-    ft_low = int(X.shape[1] * 0.3)
-    params = {
-        'n_estimators': trial.suggest_int('n_estimators', 50, est),
-        'max_depth': trial.suggest_int('max_depth', 5, dep),
-        'min_samples_split': trial.suggest_int('min_samples_split', 2, spl),
-        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, leaf),
-        'max_features': trial.suggest_int('max_features', ft_low, ft),
-        'random_state': 1,
-    }
-    
-    if mod == 'r':
-        model = RandomForestRegressor(**params)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_r, n_jobs=-1)
-    elif mod == 'c':
-        model = RandomForestClassifier(**params)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_c, n_jobs=-1)
-    elif mod == 'xr':
-        model = ExtraTreesRegressor(**params)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_r, n_jobs=-1)
-    elif mod == 'xc':
-        model = ExtraTreesClassifier(**params)
-        scores = cross_val_score(
-            model, X, y, cv=cv, scoring=scor_c, n_jobs=-1)
-    else:
-        raise ValueError("""
-Invalid model type. Choose mod:
-'r' for regression
-'c' for classification
-'xr' for extra trees regression
-'xc' for extra trees classification
-""")
-    return scores.mean()
-
-
-def catboost(trial, X, y, mod='r', scor_r='r2', scor_c='roc_auc', cv=5):
-    params = {
-        'iterations': trial.suggest_int('iterations', 100, 1000),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-        'depth': trial.suggest_int('depth', 3, 8), 
-        'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-1, 10.0, log=True),
-        'random_seed': 1,
-        'verbose': 0,
-    }
-    
-    if mod == 'r':
-        model = CatBoostRegressor(**params)
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_r, n_jobs=-1)
-        
-    elif mod == 'c':
-        model = CatBoostClassifier(**params)
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_c, n_jobs=-1)
-        
-    else:
-        raise ValueError(
-            "Choose 'r' for regression or 'c' for classification.")
-    return scores.mean()
-
-
-def objective_xgboost(trial, X, y, mod='r', scor_r='r2', scor_c='roc_auc', cv=5):
-    # Гиперпараметры для XGBoost
-    params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, 9),
-        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-        'min_child_weight': trial.suggest_int('min_child_weight', 1, 7),
-        'random_state': 1,
-        'n_jobs': -1,
-        'verbosity': 0  # Отключаем лишний вывод логов в консоль
-    }
-    
-    if mod == 'r':
-        model = XGBRegressor(**params)
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_r, n_jobs=1)
-        
-    elif mod == 'c':
-        model = XGBClassifier(**params)
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_c, n_jobs=1)
-        
-    else:
-        raise ValueError("Choose 'r' for regression or 'c' for classification.")
-        
-    return scores.mean()
-
-
-def objective_lightgbm(trial, X, y, mod='r', scor_r='r2', scor_c='roc_auc', cv=5):
-    # Гиперпараметры для LightGBM
-    params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, 10),
-        'num_leaves': trial.suggest_int('num_leaves', 15, 63), # Важный параметр для leaf-wise роста
-        'subsample': trial.suggest_float('subsample', 0.5, 1.0), # Доля объектов (bagging_fraction)
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0), # Доля признаков (feature_fraction)
-        'min_child_samples': trial.suggest_int('min_child_samples', 5, 50), # Минимальное число объектов в листе
-        'random_state': 1,
-        'n_jobs': -1,
-        'verbose': -1  # Отключаем лишний вывод и предупреждения в консоль
-    }
-    
-    if mod == 'r':
-        model = LGBMRegressor(**params)
-        # По аналогии с XGBoost: распараллеливание внутри модели, кросс-валидация в 1 поток
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_r, n_jobs=1)
-        
-    elif mod == 'c':
-        model = LGBMClassifier(**params)
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scor_c, n_jobs=1)
-        
-    else:
-        raise ValueError("Choose 'r' for regression or 'c' for classification.")
-        
-    return scores.mean()
-
-
 def objective(trial, X, y, mod, scor_r='r2', scor_c='roc_auc', *,
               seed=1, cv=5, vrb=0, row=1.0, col=1.0,
               est=250, rate=0.3, dep=8, spl=20, leaf=20):
               
-    lin_params = {'max_iter': 10000, 'random_state': seed,
-        'l1_ratio': trial.suggest_float('l1_ratio', 0.0, 1.0)
-    }
-    for_params = {
-        'n_estimators': trial.suggest_int('n_estimators', 50, est),
-        'max_depth': trial.suggest_int('max_depth', 5, dep*3),
-        'min_samples_split': trial.suggest_int('min_samples_split', 2, spl),
-        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, leaf),
-        'max_features': trial.suggest_float('max_features', 0.3, col),
-        'random_state': seed,
-        'n_jobs': -1,
-    }
-    boost_params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, est*4),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, rate, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, dep),
-        'subsample': trial.suggest_float('subsample', 0.3, row),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.3, col),
-        'random_state': seed,
-    }
-              
-    mods = {
-        'lin_c': (LogisticRegression, {**lin_params,
-            'penalty': 'elasticnet', 'solver': 'saga',
-            'C': trial.suggest_float('C', 1e-6, 1e4, log=True),
-        }),
-        'lin_r': (ElasticNet, {**lin_params,
-            'alpha': trial.suggest_float('alpha', 1e-6, 1e4, log=True),
-        }),
-        'for_c': (RandomForestClassifier, for_params),
-        'for_r': (RandomForestRegressor, for_params),
-        'xtr_c': (ExtraTreesClassifier, for_params),
-        'xtr_r': (ExtraTreesRegressor, for_params),
-        'xgb_c': (XGBClassifier, {
-            **boost_params, 'n_jobs': -1, 'verbosity': vrb}),
-        'xgb_r': (XGBRegressor, {
-            **boost_params, 'n_jobs': -1, 'verbosity': vrb}),
-        'lgb_c': (LGBMClassifier, {
-            **boost_params, 'n_jobs': -1, 'verbose': vrb-1}),
-        'lgb_r': (LGBMRegressor, {
-            **boost_params, 'n_jobs': -1, 'verbose': vrb-1}),
-        'cgb_c': (CatBoostClassifier, {
-            **boost_params, 'thread_count': -1, 'verbose': vrb}),
-        'cgb_r': (CatBoostRegressor, {
-            **boost_params, 'thread_count': -1, 'verbose': vrb})
-    }
+    mods = ('lin_r', 'lin_c', 'for_r', 'for_c', 'xtr_r', 'xtr_c',
+            'cgb_r', 'cgb_c', 'lgb_r', 'lgb_c', 'xgb_r', 'xgb_c')              
 
     if mod not in mods:
-        raise ValueError(
-            'Invalid model type. Choose from: {}'.format(mods.keys())
-        )
-    cvj = -1 if 'lin' in mod else 1
-    scoring = scor_c if '_c' in mod else scor_r
-
-    model_class, model_params = mods[mod]
-    model = model_class(**model_params)
+        raise ValueError('Invalid model type. Choose from:', mods)
+    elif mod.startswith('lin'):              
+        lin_params = {'max_iter': 10000, 'random_state': seed,
+            'l1_ratio': trial.suggest_float('l1_ratio', 0.0, 1.0)}
+        if mod == 'lin_r':
+            model = ElasticNet(**lin_params,
+                alpha=trial.suggest_float('alpha', 1e-6, 1e4, log=True))
+        elif mod == 'lin_c':
+            model = LogisticRegression(**lin_params,
+                penalty='elasticnet', solver='saga',
+                C=trial.suggest_float('C', 1e-6, 1e4, log=True))
+    elif mod.startswith('for') or mod.startswith('xtr'):
+        for_params = {
+            'n_estimators': trial.suggest_int('n_estimators', 50, est),
+            'max_depth': trial.suggest_int('max_depth', 5, dep*3),
+            'min_samples_split': trial.suggest_int('min_samples_split', 2, spl),
+            'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, leaf),
+            'max_features': trial.suggest_float('max_features', 0.3, col),
+            'random_state': seed, 'n_jobs': -1,
+        }
+        if mod == 'for_r': model = RandomForestRegressor(**for_params)
+        elif mod == 'for_c': model = RandomForestClassifier(**for_params)
+        elif mod == 'xtr_r': model = ExtraTreesRegressor(**for_params)
+        elif mod == 'xtr_c': model = ExtraTreesClassifier(**for_params)
+    elif mod.startswith('cgb'):
+        gb_params = {
+            'iterations': trial.suggest_int('iterations', 100, est*4),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, rate, log=True),
+            'depth': trial.suggest_int('depth', 3, dep),
+            'bagging_temperature': trial.suggest_float('bagging_temperature', 0.3, row),
+            'colsample_bylevel': trial.suggest_float('colsample_bylevel', 0.3, col),
+            'random_state': seed, 'verbose': vrb, 'thread_count': -1
+        }
+        if mod == 'cgb_r': model = CatBoostRegressor(**gb_params)
+        elif mod == 'cgb_c': model = CatBoostClassifier(**gb_params)
+    else:
+        gb_params = {
+            'n_estimators': trial.suggest_int('n_estimators', 100, est*4),
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, rate, log=True),
+            'max_depth': trial.suggest_int('max_depth', 3, dep),
+            'subsample': trial.suggest_float('subsample', 0.3, row),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.3, col),
+            'random_state': seed, 'n_jobs': -1
+        }
+        if mod == 'lgb_c': model = LGBMClassifier(**gb_params, verbose=vrb-1)
+        elif mod == 'lgb_r': model = LGBMRegressor(**gb_params, verbose=vrb-1)
+        elif mod == 'xgb_c': model = XGBClassifier(**gb_params, verbosity=vrb)
+        elif mod == 'xgb_r': model = XGBRegressor(**gb_params, verbosity=vrb)
+    
+    cvj = -1 if mod.startswith('lin') else 1
+    scoring = scor_c if mod.endswith('_c') else scor_r
     score = cross_val_score(
         model, X, y, cv=cv, scoring=scoring, n_jobs=cvj).mean()
 
