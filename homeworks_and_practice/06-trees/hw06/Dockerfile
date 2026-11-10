@@ -6,5 +6,6 @@ COPY "pyproject.toml" "uv.lock" ".python-version" ./
 COPY "src/" ./src/
 RUN uv sync --locked --no-dev --no-install-project
 COPY "predict.py" "model.bin" ./
+RUN uv cache clean
 EXPOSE 9696
 ENTRYPOINT ["uvicorn", "predict:app", "--host", "0.0.0.0", "--port", "9696"]
