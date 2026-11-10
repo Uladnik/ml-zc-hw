@@ -8,18 +8,11 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "catboost>=1.2.10",
     "fastapi>=0.162.0",
-    "lightgbm>=4.7.0",
-    "matplotlib>=3.11.2",
     "numpy>=2.4.6",
-    "optuna>=5.0.0",
     "pandas>=3.1.0",
-    "plotly>=7.1.0",
     "scikit-learn>=1.9.1",
-    "seaborn>=0.13.2",
     "uvicorn>=0.54.0",
-    "xgboost>=3.2.0",
 ]
 
 [project.scripts]
@@ -32,4 +25,5 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "requests>=2.34.2",
+    "optuna>=5.0.0",
 ]
