@@ -1,0 +1,1 @@
+uv run pip install numpy pandas scikit-learn matplotlib seaborn xgboost catboost lightgbm optuna plotly fastapi uvicorn
