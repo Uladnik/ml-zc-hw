@@ -1199,7 +1199,7 @@ wheels = [
 [[package]]
 name = "pancreatic-cancer"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "catboost" },
     { name = "fastapi" },
