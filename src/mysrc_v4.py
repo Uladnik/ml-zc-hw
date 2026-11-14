@@ -1,3 +1,14 @@
+"""
+Preprocessing and Hyperparameter Optimization Module.
+
+This module provides helper utilities for:
+- Data exploration and overview summaries (`overview`).
+- Data cleaning and standardization of column names and text (`uniform`).
+- Feature engineering, such as missing value indicator flags (`add_columns`).
+- Building standard scikit-learn preprocessing pipelines (`preprocess`).
+- Hyperparameter tuning via Optuna for a wide range of ML models (`objective`).
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
@@ -30,21 +41,70 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 
-def overview(df):
+def overview(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Generates a comprehensive summary dataframe for exploratory data analysis (EDA).
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe to analyze.
+        
+    Returns:
+    --------
+    pd.DataFrame
+        A summary table containing data types, number of unique values, 
+        missing value counts, combined with the transposed head of the dataframe.
+    """
     summary = pd.DataFrame(
         {"dtype": df.dtypes, "nunique": df.nunique(), "missing": df.isnull().sum()}
     ).join(df.head().T)
     return summary
 
 
-def uniform(df):
+def uniform(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalizes column names and string object values by converting them to lowercase 
+    and replacing spaces with underscores.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe.
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe with cleaned column names and string values.
+    """
+    df = df.copy()
+    # Normalize column names
     df.columns = df.columns.str.replace(" ", "_").str.lower()
+    
+    # Normalize string/categorical values
     for col in df.select_dtypes(exclude=["number"]).columns:
         df[col] = df[col].astype("str").str.replace(" ", "_").str.lower()
+        
     return df
 
 
-def add_columns(df, na_limit=0.05):
+def add_columns(df: pd.DataFrame, na_limit: float = 0.05) -> pd.DataFrame:
+    """
+    Feature engineering helper: creates missing value indicator columns 
+    for numeric features where missingness exceeds a specified ratio.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe.
+    na_limit : float, default=0.05
+        Threshold ratio of missing values to trigger indicator creation.
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe with added binary indicator columns ('_is_na').
+    """
     df = df.copy()
 
     for col in df.select_dtypes(include=["number"]).columns:
@@ -54,13 +114,26 @@ def add_columns(df, na_limit=0.05):
     return df
 
 
-def preprocess():
+def preprocess() -> ColumnTransformer:
+    """
+    Constructs a scikit-learn ColumnTransformer pipeline for numerical scaling 
+    and categorical one-hot encoding.
+    
+    Returns:
+    --------
+    ColumnTransformer
+        Configured preprocessor object.
+    """
+    # Selectors for numerical and categorical features
     nums = make_column_selector(dtype_include=["number"])
     cats = make_column_selector(dtype_exclude=["number"])
+    
+    # Pipelines for each data type
     nt = Pipeline([("scaler", StandardScaler())])
     ct = Pipeline([("onehot", OneHotEncoder(
                     sparse_output=False, handle_unknown="ignore", drop="first"
                  ))])
+                 
     preprocessor = ColumnTransformer([("num", nt, nums), ("cat", ct, cats)])
     return preprocessor
 
@@ -69,13 +142,42 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
               scor_r='r2', scor_c='roc_auc', *,
               seed=1, cv=5, vrb=0, row=1.0, col=1.0,
               est=250, rate=0.3, dep=8, spl=20, leaf=20):
-              
+    """
+    Optuna objective function for tuning various machine learning models 
+    (Linear, Tree-based ensembles, CatBoost, LightGBM, XGBoost) for both regression and classification.
+    
+    Parameters:
+    -----------
+    trial : optuna.trial.Trial
+        Optuna trial object for hyperparameter suggestion.
+    X, y : array-like or pd.DataFrame
+        Training features and target.
+    Xv, yv : array-like or pd.DataFrame, optional
+        Validation features and target (if holdout evaluation is preferred).
+    mod : str, default='lin_r'
+        Model type identifier (e.g., 'lin_r', 'for_c', 'xgb_c', 'cgb_r', etc.).
+    scor_r, scor_c : str
+        Scoring metrics for regression and classification respectively.
+    seed : int, default=1
+        Random seed for reproducibility.
+    cv : int, default=5
+        Number of cross-validation folds.
+        
+    Returns:
+    --------
+    float
+        Evaluation score (cross-validation mean score or validation metric).
+    """
+             
     mods = ('lin_r', 'lin_c', 'for_r', 'for_c', 'xtr_r', 'xtr_c',
-            'cgb_r', 'cgb_c', 'lgb_r', 'lgb_c', 'xgb_r', 'xgb_c')              
+            'cgb_r', 'cgb_c', 'lgb_r', 'lgb_c', 'xgb_r', 'xgb_c')             
 
+    # Validate model type
     if mod not in mods:
         raise ValueError('Invalid model type. Choose from:', mods)
-    elif mod.startswith('lin'):              
+        
+    # Linear Models (ElasticNet / Logistic Regression)
+    elif mod.startswith('lin'):             
         lin_params = {'max_iter': 10000, 'random_state': seed,
             'l1_ratio': trial.suggest_float('l1_ratio', 0.0, 1.0)}
         if mod == 'lin_r':
@@ -85,6 +187,8 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
             model = LogisticRegression(**lin_params,
                 penalty='elasticnet', solver='saga',
                 C=trial.suggest_float('C', 1e-4, 100.0, log=True))
+                
+    # Tree-based Ensembles (Random Forest / Extra Trees)
     elif mod.startswith('for') or mod.startswith('xtr'):
         for_params = {
             'n_estimators': trial.suggest_int('n_estimators', 50, est),
@@ -98,6 +202,8 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
         elif mod == 'for_c': model = RandomForestClassifier(**for_params)
         elif mod == 'xtr_r': model = ExtraTreesRegressor(**for_params)
         elif mod == 'xtr_c': model = ExtraTreesClassifier(**for_params)
+        
+    # CatBoost Models
     elif mod.startswith('cgb'):
         gb_params = {
             'iterations': trial.suggest_int('iterations', 100, est*4),
@@ -109,6 +215,8 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
         }
         if mod == 'cgb_r': model = CatBoostRegressor(**gb_params)
         elif mod == 'cgb_c': model = CatBoostClassifier(**gb_params)
+        
+    # LightGBM & XGBoost Models
     else:
         gb_params = {
             'n_estimators': trial.suggest_int('n_estimators', 100, est*4),
@@ -123,6 +231,7 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
         elif mod == 'xgb_c': model = XGBClassifier(**gb_params, verbosity=vrb)
         elif mod == 'xgb_r': model = XGBRegressor(**gb_params, verbosity=vrb)
     
+    # Evaluate model using Validation set or Cross-Validation
     scoring = scor_c if mod.endswith('_c') else scor_r
     if Xv is not None and yv is not None:
         model.fit(X, y)
@@ -141,5 +250,5 @@ def objective(trial, X, y, Xv=None, yv=None, mod='lin_r',
     else:
         return cross_val_score(model, X, y, cv=cv, scoring=scoring, n_jobs=1).mean()
 
-            
+# Global preprocessor instance
 preprocessor = preprocess()
