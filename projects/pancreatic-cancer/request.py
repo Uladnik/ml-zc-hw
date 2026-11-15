@@ -1,7 +1,7 @@
 import requests
 
 # Define the prediction service URL
-url = 'http://localhost:9696/predict'
+url = 'http://localhost:7860/predict'
 
 # Define the sample patient data payload matching the Pydantic schema
 patient = {

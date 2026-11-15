@@ -144,7 +144,7 @@ class PredictResponse(BaseModel):
 # ==========================================
 # 2. App Initialization & Model Loading
 # ==========================================
-app = FastAPI(title="pancreatic-cancer-survival")
+app = FastAPI(title="pancreatic-cancer-survival-v1.0", version="1.0")
 
 # Load the serialized pipeline (preprocessor + model)
 with open('model.bin', "rb") as f_in:
@@ -185,4 +185,4 @@ def predict(patient: PatientData) -> PredictResponse:
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=9696)
+    uvicorn.run(app, host="0.0.0.0", port=7860)

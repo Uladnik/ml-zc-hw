@@ -38,7 +38,7 @@ This ensures **100% end-to-end reproducibility** for reviewers—allowing anyone
    uv run python train.py
 
 5. **Start the prediction service:**
-   uv run uvicorn predict:app --reload --port 9696   
+   uv run uvicorn predict:app --reload --port 7860   
 
 ### 5. Preprocessing & Feature Engineering Module (`preprocess.py`)
 To maintain a clean and modular codebase, all core data transformation and modeling logic is centralized in `preprocess.py`. Key components include:
@@ -77,7 +77,7 @@ To deploy the trained XGBoost model into production, the repository features a r
 
 #### Running the API Locally
 ```bash
-uv run uvicorn predict:app --reload --port 9696
+uv run uvicorn predict:app --reload --port 7860
 ```
 
 ### Testing the Service

@@ -24,7 +24,7 @@ COPY "predict.py" "model.bin" ./
 RUN uv cache clean
 
 # Expose the port that the FastAPI application runs on
-EXPOSE 9696
+EXPOSE 7860
 
 # Define the default command to start the application using Uvicorn
-ENTRYPOINT ["uvicorn", "predict:app", "--host", "0.0.0.0", "--port", "9696"]
+ENTRYPOINT ["uvicorn", "predict:app", "--host", "0.0.0.0", "--port", "7860"]
